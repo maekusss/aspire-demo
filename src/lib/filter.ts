@@ -45,6 +45,8 @@ export function filterTransactions(transactions: Transaction[], filters: Filters
 export function describeFilters(filters: Filters) {
   const chips: Array<{ key: keyof Filters | 'amount'; label: string }> = []
 
+  const search = filters.search.trim()
+  if (search) chips.push({ key: 'search', label: `Search: ${search}` })
   if (filters.datePreset !== 'all') {
     const labels = { '30d': 'Last 30 days', '90d': 'Last 90 days', ytd: 'Year to date', all: 'All time' }
     chips.push({ key: 'datePreset', label: `Date: ${labels[filters.datePreset]}` })
