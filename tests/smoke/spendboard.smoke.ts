@@ -39,6 +39,21 @@ test('renders the high-volume dashboard without layout overflow', async ({ page 
   )
 
   expect(hasHorizontalOverflow).toBe(false)
+
+  if (test.info().project.name === 'mobile-chromium') {
+    const table = page.locator('.data-table')
+    const horizontalScroll = await table.evaluate((element) => {
+      const overflow = element.scrollWidth - element.clientWidth
+      element.scrollLeft = overflow
+      return { overflow, scrollLeft: element.scrollLeft }
+    })
+
+    expect(horizontalScroll.overflow).toBeGreaterThan(0)
+    expect(horizontalScroll.scrollLeft).toBeGreaterThan(0)
+    await expect(page.getByRole('button', { name: 'Status', exact: true })).toBeInViewport()
+    await page.getByTestId('transaction-row').first().locator('.merchant-cell').click()
+    await expect(page.getByTestId('detail-drawer')).toBeVisible()
+  }
 })
 
 test('filters transactions by search, status, and saved view', async ({ page }) => {

@@ -880,3 +880,53 @@ button.checkbox-shell.checked,
     height: 520px;
   }
 }
+
+@media (max-width: 700px) {
+  body {
+    min-width: 0;
+  }
+
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 6px 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar .side-section {
+    display: none;
+  }
+
+  .sidebar .side-item,
+  .sidebar .saved-view {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .dashboard {
+    padding: 10px;
+  }
+
+  .chart-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .data-table {
+    overflow-x: auto;
+  }
+
+  .table-head,
+  .table-scroll {
+    min-width: 828px;
+  }
+
+  .detail-drawer {
+    max-width: 100vw;
+  }
+}
