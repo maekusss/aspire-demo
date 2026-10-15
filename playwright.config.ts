@@ -32,5 +32,15 @@ export default defineConfig({
         viewport: { width: 1440, height: 920 },
       },
     },
+    {
+      name: 'mobile-chromium',
+      grep: /renders the high-volume dashboard without layout overflow/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
 })
