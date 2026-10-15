@@ -370,6 +370,7 @@ function App() {
                 <Search size={14} />
                 <input
                   ref={searchRef}
+                  aria-label="Search transactions"
                   value={filters.search}
                   onChange={(event) => patchFilters({ search: event.target.value })}
                   placeholder="Search merchants or descriptions"
@@ -440,6 +441,7 @@ function App() {
 
               <label className="amount-filter">
                 <input
+                  aria-label="Minimum amount"
                   value={filters.minAmount}
                   onChange={(event) => patchFilters({ minAmount: event.target.value })}
                   inputMode="numeric"
@@ -447,6 +449,7 @@ function App() {
                 />
                 <span>-</span>
                 <input
+                  aria-label="Maximum amount"
                   value={filters.maxAmount}
                   onChange={(event) => patchFilters({ maxAmount: event.target.value })}
                   inputMode="numeric"
