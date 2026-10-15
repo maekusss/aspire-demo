@@ -5,9 +5,11 @@ import { emptyFilters } from '../lib/constants'
 
 type AppState = {
   filters: Filters
+  activeViewId: string | null
   savedViews: SavedView[]
   theme: 'light' | 'dark'
   setFilters: (filters: Filters) => void
+  selectPreset: (preset: 'flagged' | 'month') => void
   patchFilters: (filters: Partial<Filters>) => void
   resetFilters: () => void
   clearFilter: (key: keyof Filters | 'amount') => void
@@ -18,10 +20,22 @@ type AppState = {
   toggleTheme: () => void
 }
 
+const filtersAreEmpty = (filters: Filters) =>
+  filters.search === '' &&
+  filters.datePreset === 'all' &&
+  filters.categories.length === 0 &&
+  filters.cards.length === 0 &&
+  filters.statuses.length === 0 &&
+  filters.minAmount === '' &&
+  filters.maxAmount === ''
+
+const manualViewId = (filters: Filters) => (filtersAreEmpty(filters) ? 'all' : null)
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       filters: emptyFilters,
+      activeViewId: 'all',
       savedViews: [
         {
           id: 'view_saas_high',
@@ -37,15 +51,27 @@ export const useAppStore = create<AppState>()(
         },
       ],
       theme: 'light',
-      setFilters: (filters) => set({ filters }),
-      patchFilters: (patch) => set((state) => ({ filters: { ...state.filters, ...patch } })),
-      resetFilters: () => set({ filters: emptyFilters }),
+      setFilters: (filters) => set({ filters, activeViewId: manualViewId(filters) }),
+      selectPreset: (preset) => {
+        const filters: Filters = preset === 'flagged'
+          ? { ...emptyFilters, statuses: ['Flagged'] }
+          : { ...emptyFilters, datePreset: '30d' }
+        set({ filters, activeViewId: preset })
+      },
+      patchFilters: (patch) =>
+        set((state) => {
+          const filters = { ...state.filters, ...patch }
+          return { filters, activeViewId: manualViewId(filters) }
+        }),
+      resetFilters: () => set({ filters: emptyFilters, activeViewId: 'all' }),
       clearFilter: (key) =>
         set((state) => {
           if (key === 'amount') {
-            return { filters: { ...state.filters, minAmount: '', maxAmount: '' } }
+            const filters = { ...state.filters, minAmount: '', maxAmount: '' }
+            return { filters, activeViewId: manualViewId(filters) }
           }
-          return { filters: { ...state.filters, [key]: emptyFilters[key] } }
+          const filters = { ...state.filters, [key]: emptyFilters[key] }
+          return { filters, activeViewId: manualViewId(filters) }
         }),
       saveView: (name) => {
         const trimmed = name.trim()
@@ -60,9 +86,13 @@ export const useAppStore = create<AppState>()(
       },
       loadView: (id) => {
         const view = get().savedViews.find((candidate) => candidate.id === id)
-        if (view) set({ filters: view.filters })
+        if (view) set({ filters: view.filters, activeViewId: id })
       },
-      removeView: (id) => set((state) => ({ savedViews: state.savedViews.filter((view) => view.id !== id) })),
+      removeView: (id) =>
+        set((state) => ({
+          savedViews: state.savedViews.filter((view) => view.id !== id),
+          activeViewId: state.activeViewId === id ? manualViewId(state.filters) : state.activeViewId,
+        })),
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
     }),
@@ -70,6 +100,7 @@ export const useAppStore = create<AppState>()(
       name: 'spendboard-state',
       partialize: (state) => ({
         filters: state.filters,
+        activeViewId: state.activeViewId,
         savedViews: state.savedViews,
         theme: state.theme,
       }),
