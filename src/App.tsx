@@ -31,6 +31,7 @@ import type { Filters, Transaction } from './data/types'
 import { statuses, statusTone } from './lib/constants'
 import { exportTransactionsCsv } from './lib/exportCsv'
 import { describeFilters, filterTransactions } from './lib/filter'
+import { calculateMonthDelta } from './lib/monthDelta'
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -847,8 +848,8 @@ function buildMetrics(data: Transaction[]): Metric[] {
     {
       label: 'Total spend',
       value: total,
-      delta: `${mom >= 0 ? '+' : ''}${mom.toFixed(1)}% MoM`,
-      tone: mom >= 0 ? 'positive' : 'negative',
+      delta: mom.delta,
+      tone: mom.tone,
       format: formatCompactCurrency,
     },
     {
@@ -879,25 +880,6 @@ function topBy(data: Transaction[], getLabel: (transaction: Transaction) => stri
   return Array.from(totals.entries())
     .map(([label, total]) => ({ label, total }))
     .sort((a, b) => b.total - a.total)[0]
-}
-
-function calculateMonthDelta(data: Transaction[]) {
-  const now = new Date()
-  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-  let current = 0
-  let previous = 0
-
-  for (const transaction of data) {
-    const date = new Date(transaction.date)
-    if (date >= thisMonth) current += transaction.amount
-    else if (date >= lastMonth && date < thisMonth) previous += transaction.amount
-    else if (previous === 0 && date >= twoMonthsAgo && date < lastMonth) previous += transaction.amount
-  }
-
-  if (previous === 0) return 0
-  return ((current - previous) / previous) * 100
 }
 
 function buildSpendOverTime(data: Transaction[]) {
