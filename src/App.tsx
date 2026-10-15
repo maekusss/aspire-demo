@@ -30,7 +30,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent a
 import type { Filters, Transaction } from './data/types'
 import { statuses, statusTone } from './lib/constants'
 import { exportTransactionsCsv } from './lib/exportCsv'
-import { describeFilters, filterTransactions } from './lib/filter'
+import { describeFilters, filterTransactions, validateAmountBounds } from './lib/filter'
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -146,6 +146,7 @@ function App() {
     () => Array.from(new Set(transactions.map((transaction) => transaction.card))).sort(),
     [transactions],
   )
+  const amountBounds = validateAmountBounds(filters)
 
   const filteredTransactions = useMemo(
     () => (loadState === 'ready' ? filterTransactions(transactions, filters) : []),
@@ -442,15 +443,21 @@ function App() {
                 <input
                   value={filters.minAmount}
                   onChange={(event) => patchFilters({ minAmount: event.target.value })}
-                  inputMode="numeric"
+                  inputMode="decimal"
                   placeholder="Min"
+                  aria-label="Minimum amount"
+                  aria-invalid={amountBounds.invalid === 'min' || amountBounds.invalid === 'range'}
+                  aria-describedby={amountBounds.error ? 'amount-filter-error' : undefined}
                 />
                 <span>-</span>
                 <input
                   value={filters.maxAmount}
                   onChange={(event) => patchFilters({ maxAmount: event.target.value })}
-                  inputMode="numeric"
+                  inputMode="decimal"
                   placeholder="Max"
+                  aria-label="Maximum amount"
+                  aria-invalid={amountBounds.invalid === 'max' || amountBounds.invalid === 'range'}
+                  aria-describedby={amountBounds.error ? 'amount-filter-error' : undefined}
                 />
               </label>
 
@@ -461,6 +468,11 @@ function App() {
                 <Download size={14} /> CSV
               </button>
             </div>
+            {amountBounds.error && (
+              <p className="amount-filter-error" id="amount-filter-error" role="alert">
+                {amountBounds.error} Amount filter is not applied until corrected.
+              </p>
+            )}
 
             <div className="table-meta" data-testid="table-meta">
               <span>{numberFormatter.format(rows.length)} of {numberFormatter.format(transactions.length)} transactions</span>

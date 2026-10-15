@@ -18,11 +18,36 @@ export function getDateFloor(preset: Filters['datePreset']) {
   return null
 }
 
+const decimalAmount = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
+
+function parseAmountBound(raw: string) {
+  const value = raw.trim()
+  if (!value) return null
+  if (!decimalAmount.test(value)) return NaN
+  return Number(value)
+}
+
+export function validateAmountBounds(filters: Pick<Filters, 'minAmount' | 'maxAmount'>) {
+  const min = parseAmountBound(filters.minAmount)
+  const max = parseAmountBound(filters.maxAmount)
+
+  if (min !== null && !Number.isFinite(min)) {
+    return { min: null, max: null, error: 'Enter a valid number for Min.', invalid: 'min' as const }
+  }
+  if (max !== null && !Number.isFinite(max)) {
+    return { min: null, max: null, error: 'Enter a valid number for Max.', invalid: 'max' as const }
+  }
+  if (min !== null && max !== null && min > max) {
+    return { min: null, max: null, error: 'Min must be less than or equal to Max.', invalid: 'range' as const }
+  }
+
+  return { min, max, error: null, invalid: null }
+}
+
 export function filterTransactions(transactions: Transaction[], filters: Filters) {
   const query = filters.search.trim().toLowerCase()
   const dateFloor = getDateFloor(filters.datePreset)
-  const minAmount = filters.minAmount === '' ? null : Number(filters.minAmount)
-  const maxAmount = filters.maxAmount === '' ? null : Number(filters.maxAmount)
+  const { min: minAmount, max: maxAmount } = validateAmountBounds(filters)
   const categorySet = new Set(filters.categories)
   const cardSet = new Set(filters.cards)
   const statusSet = new Set(filters.statuses)
@@ -52,7 +77,7 @@ export function describeFilters(filters: Filters) {
   if (filters.categories.length > 0) chips.push({ key: 'categories', label: `Category: ${filters.categories.join(', ')}` })
   if (filters.cards.length > 0) chips.push({ key: 'cards', label: `Card: ${filters.cards.join(', ')}` })
   if (filters.statuses.length > 0) chips.push({ key: 'statuses', label: `Status: ${filters.statuses.join(', ')}` })
-  if (filters.minAmount || filters.maxAmount) {
+  if (!validateAmountBounds(filters).error && (filters.minAmount.trim() || filters.maxAmount.trim())) {
     chips.push({
       key: 'amount',
       label: `Amount: ${filters.minAmount || '0'}-${filters.maxAmount || 'any'}`,

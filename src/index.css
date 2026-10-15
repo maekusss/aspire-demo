@@ -427,6 +427,16 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.amount-filter:has(input[aria-invalid="true"]) {
+  border-color: var(--danger);
+}
+
+.amount-filter-error {
+  margin: 0 0 8px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
 .ghost-button {
   padding: 0 10px;
   font-size: 12px;
