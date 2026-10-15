@@ -324,7 +324,7 @@ function App() {
           <button className="side-item" type="button" onClick={() => patchFilters({ statuses: ['Flagged'] })}>
             <Flag size={14} /> Flagged
           </button>
-          <button className="side-item" type="button" onClick={() => patchFilters({ datePreset: '30d' })}>
+          <button className="side-item" type="button" onClick={() => patchFilters({ datePreset: 'month' })}>
             <Sparkles size={14} /> This month
           </button>
 
@@ -391,6 +391,7 @@ function App() {
                 aria-label="Date range"
               >
                 <option value="all">+ Date</option>
+                <option value="month">This month</option>
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
                 <option value="ytd">Year to date</option>

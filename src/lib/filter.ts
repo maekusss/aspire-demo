@@ -2,6 +2,9 @@ import type { Filters, Transaction } from '../data/types'
 
 export function getDateFloor(preset: Filters['datePreset']) {
   const now = new Date()
+  if (preset === 'month') {
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  }
   if (preset === '30d') {
     const date = new Date(now)
     date.setDate(date.getDate() - 30)
@@ -46,7 +49,7 @@ export function describeFilters(filters: Filters) {
   const chips: Array<{ key: keyof Filters | 'amount'; label: string }> = []
 
   if (filters.datePreset !== 'all') {
-    const labels = { '30d': 'Last 30 days', '90d': 'Last 90 days', ytd: 'Year to date', all: 'All time' }
+    const labels = { month: 'This month', '30d': 'Last 30 days', '90d': 'Last 90 days', ytd: 'Year to date', all: 'All time' }
     chips.push({ key: 'datePreset', label: `Date: ${labels[filters.datePreset]}` })
   }
   if (filters.categories.length > 0) chips.push({ key: 'categories', label: `Category: ${filters.categories.join(', ')}` })
