@@ -31,6 +31,7 @@ import type { Filters, Transaction } from './data/types'
 import { statuses, statusTone } from './lib/constants'
 import { exportTransactionsCsv } from './lib/exportCsv'
 import { describeFilters, filterTransactions } from './lib/filter'
+import { buildSpendOverTime } from './lib/spend'
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -898,23 +899,6 @@ function calculateMonthDelta(data: Transaction[]) {
 
   if (previous === 0) return 0
   return ((current - previous) / previous) * 100
-}
-
-function buildSpendOverTime(data: Transaction[]) {
-  const buckets = new Map<string, number>()
-  const now = new Date()
-  for (let index = 11; index >= 0; index -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - index, 1)
-    buckets.set(date.toLocaleString('en-US', { month: 'short' }), 0)
-  }
-
-  for (const transaction of data) {
-    const date = new Date(transaction.date)
-    const key = date.toLocaleString('en-US', { month: 'short' })
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + transaction.amount)
-  }
-
-  return Array.from(buckets.entries()).map(([month, spend]) => ({ month, spend }))
 }
 
 function buildSpendByCategory(data: Transaction[]) {
