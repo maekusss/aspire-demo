@@ -26,7 +26,7 @@ import {
   WalletCards,
   X,
 } from 'lucide-react'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Filters, Transaction } from './data/types'
 import { statuses, statusTone } from './lib/constants'
 import { exportTransactionsCsv } from './lib/exportCsv'
@@ -104,6 +104,7 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const searchRef = useRef<HTMLInputElement>(null)
   const tableScrollRef = useRef<HTMLDivElement>(null)
+  const requestRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -116,27 +117,30 @@ function App() {
     }
   }, [setTheme])
 
-  useEffect(() => {
-    let cancelled = false
-    fetch(`${import.meta.env.BASE_URL}data/transactions.json`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Failed to load transactions: ${response.status}`)
-        return response.json() as Promise<Transaction[]>
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setTransactions(data)
-          setLoadState('ready')
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLoadState('error')
-      })
+  const loadTransactions = useCallback(async () => {
+    requestRef.current?.abort()
+    const controller = new AbortController()
+    requestRef.current = controller
+    setLoadState('loading')
 
-    return () => {
-      cancelled = true
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}data/transactions.json`, {
+        signal: controller.signal,
+      })
+      if (!response.ok) throw new Error(`Failed to load transactions: ${response.status}`)
+      const data = (await response.json()) as Transaction[]
+      if (controller.signal.aborted) return
+      setTransactions(data)
+      setLoadState('ready')
+    } catch {
+      if (!controller.signal.aborted) setLoadState('error')
     }
   }, [])
+
+  useEffect(() => {
+    void loadTransactions()
+    return () => requestRef.current?.abort()
+  }, [loadTransactions])
 
   const categories = useMemo(
     () => Array.from(new Set(transactions.map((transaction) => transaction.category))).sort(),
@@ -495,7 +499,7 @@ function App() {
 
               <div className="table-scroll" ref={tableScrollRef}>
                 {loadState === 'loading' && <LoadingRows />}
-                {loadState === 'error' && <ErrorState />}
+                {loadState === 'error' && <ErrorState onRetry={loadTransactions} />}
                 {loadState === 'ready' && rows.length === 0 && <EmptyState resetFilters={resetFilters} />}
                 {loadState === 'ready' && rows.length > 0 && (
                   <div className="virtual-canvas" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
@@ -824,14 +828,17 @@ function EmptyState({ resetFilters }: { resetFilters: () => void }) {
   )
 }
 
-function ErrorState() {
+function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="empty-state">
       <div className="empty-icon danger-icon">
         <X size={20} />
       </div>
       <h2>Transactions failed to load</h2>
-      <p>The static dataset could not be read. Regenerate it with npm run gen:data, then refresh.</p>
+      <p>The static dataset could not be read. Try again, or regenerate it with npm run gen:data if the problem persists.</p>
+      <button className="ghost-button" type="button" onClick={onRetry}>
+        Retry
+      </button>
     </div>
   )
 }
