@@ -119,10 +119,11 @@ describe('filterTransactions', () => {
 })
 
 describe('describeFilters', () => {
-  it('returns active filter chips in a recruiter-readable order', () => {
+  it('returns active filter chips in display order', () => {
     expect(
       describeFilters({
         ...baseFilters,
+        search: '  United  ',
         datePreset: '90d',
         categories: ['Travel', 'Software'],
         cards: ['Operations'],
@@ -131,11 +132,17 @@ describe('describeFilters', () => {
         maxAmount: '1000',
       }),
     ).toEqual([
+      { key: 'search', label: 'Search: United' },
       { key: 'datePreset', label: 'Date: Last 90 days' },
       { key: 'categories', label: 'Category: Travel, Software' },
       { key: 'cards', label: 'Card: Operations' },
       { key: 'statuses', label: 'Status: Pending' },
       { key: 'amount', label: 'Amount: 100-1000' },
     ])
+  })
+
+  it('does not describe an empty or whitespace-only search', () => {
+    expect(describeFilters(baseFilters)).toEqual([])
+    expect(describeFilters({ ...baseFilters, search: ' \t\n ' })).toEqual([])
   })
 })
