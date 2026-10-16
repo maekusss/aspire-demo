@@ -31,7 +31,7 @@ test('renders the high-volume dashboard without layout overflow', async ({ page 
   await expect(page.getByText('SpendBoard')).toBeVisible()
   await expect(page.getByLabel('Summary metrics')).toBeVisible()
   await expect(page.getByLabel('Spend charts')).toBeVisible()
-  await expect(page.getByLabel('Transactions')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Transactions' })).toBeVisible()
   await expect(page.getByTestId('transaction-row').first()).toBeVisible()
 
   const hasHorizontalOverflow = await page.evaluate(
@@ -42,7 +42,7 @@ test('renders the high-volume dashboard without layout overflow', async ({ page 
 })
 
 test('filters transactions by search, status, and saved view', async ({ page }) => {
-  await page.getByPlaceholder('Search merchants or descriptions').fill(latestTransaction.merchant)
+  await page.getByRole('textbox', { name: 'Search transactions' }).fill(latestTransaction.merchant)
 
   await expect(page.getByTestId('table-meta')).toContainText(countLabel(searchCount))
   await expect(page.getByTestId('transaction-row').first()).toContainText(latestTransaction.merchant)
@@ -57,6 +57,34 @@ test('filters transactions by search, status, and saved view', async ({ page }) 
   await page.getByRole('button', { name: 'SaaS > $500', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Category: SaaS' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Amount: 500-any' })).toBeVisible()
+})
+
+test('keeps filter inputs named and preserves amount and search shortcuts', async ({ page }) => {
+  const search = page.getByRole('textbox', { name: 'Search transactions' })
+  const minimum = page.getByRole('textbox', { name: 'Minimum amount' })
+  const maximum = page.getByRole('textbox', { name: 'Maximum amount' })
+
+  await page.keyboard.press('/')
+  await expect(search).toBeFocused()
+
+  await minimum.fill('500')
+  await maximum.fill('1000')
+
+  const amountCount = transactions.filter((transaction) => transaction.amount >= 500 && transaction.amount <= 1000).length
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(amountCount))
+  await expect(minimum).toHaveValue('500')
+  await expect(maximum).toHaveValue('1000')
+
+  await search.fill(latestTransaction.merchant)
+  const combinedCount = transactions.filter((transaction) =>
+    transaction.amount >= 500 &&
+    transaction.amount <= 1000 &&
+    `${transaction.merchant} ${transaction.description} ${transaction.owner}`
+      .toLowerCase()
+      .includes(latestTransaction.merchant.toLowerCase()),
+  ).length
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(combinedCount))
+  await expect(search).toHaveValue(latestTransaction.merchant)
 })
 
 test('opens transaction details, selection bulk actions, and command palette', async ({ page }) => {
