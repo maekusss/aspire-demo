@@ -82,9 +82,11 @@ const columns: ColumnDef<Transaction>[] = [
 function App() {
   const {
     filters,
+    activeViewId,
     savedViews,
     theme,
     patchFilters,
+    selectPreset,
     resetFilters,
     clearFilter,
     saveView,
@@ -187,6 +189,7 @@ function App() {
   const spendOverTime = useMemo(() => buildSpendOverTime(filteredTransactions), [filteredTransactions])
   const spendByCategory = useMemo(() => buildSpendByCategory(filteredTransactions), [filteredTransactions])
   const activeChips = describeFilters(filters)
+  const selectedViewId = activeViewId ?? (activeChips.length === 0 && !filters.search ? 'all' : null)
 
   useEffect(() => {
     const shouldOpenDrawer = new URLSearchParams(window.location.search).get('drawer') === '1'
@@ -318,20 +321,40 @@ function App() {
       <div className="layout">
         <aside className="sidebar" aria-label="Saved views">
           <div className="side-section">Views</div>
-          <button className="side-item active" type="button" onClick={resetFilters}>
+          <button
+            className={`side-item${selectedViewId === 'all' ? ' active' : ''}`}
+            type="button"
+            aria-pressed={selectedViewId === 'all'}
+            onClick={resetFilters}
+          >
             <PanelRight size={14} /> All transactions
           </button>
-          <button className="side-item" type="button" onClick={() => patchFilters({ statuses: ['Flagged'] })}>
+          <button
+            className={`side-item${selectedViewId === 'flagged' ? ' active' : ''}`}
+            type="button"
+            aria-pressed={selectedViewId === 'flagged'}
+            onClick={() => selectPreset('flagged')}
+          >
             <Flag size={14} /> Flagged
           </button>
-          <button className="side-item" type="button" onClick={() => patchFilters({ datePreset: '30d' })}>
+          <button
+            className={`side-item${selectedViewId === 'month' ? ' active' : ''}`}
+            type="button"
+            aria-pressed={selectedViewId === 'month'}
+            onClick={() => selectPreset('month')}
+          >
             <Sparkles size={14} /> This month
           </button>
 
           <div className="side-section">Saved</div>
           {savedViews.map((view) => (
             <div className="saved-view" key={view.id}>
-              <button className="side-item" type="button" onClick={() => loadView(view.id)}>
+              <button
+                className={`side-item${selectedViewId === view.id ? ' active' : ''}`}
+                type="button"
+                aria-pressed={selectedViewId === view.id}
+                onClick={() => loadView(view.id)}
+              >
                 <Bookmark size={14} /> {view.name}
               </button>
               <button
