@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Filters, Transaction } from '../data/types'
-import { describeFilters, filterTransactions, getDateFloor } from './filter'
+import { describeFilters, filterTransactions, getDateFloor, validateAmountBounds } from './filter'
 
 const baseFilters: Filters = {
   search: '',
@@ -110,6 +110,42 @@ describe('filterTransactions', () => {
     })
 
     expect(result.map((txn) => txn.id)).toEqual(['txn_2'])
+  })
+
+  it('treats empty and whitespace amount bounds as unbounded', () => {
+    expect(validateAmountBounds({ minAmount: '  ', maxAmount: '' })).toMatchObject({ min: null, max: null, error: null })
+    expect(filterTransactions(transactions, { ...baseFilters, minAmount: '  ' })).toEqual(transactions)
+  })
+
+  it('filters with either bound, both bounds, and an inclusive equal range', () => {
+    const ids = (minAmount: string, maxAmount: string) =>
+      filterTransactions(transactions, { ...baseFilters, minAmount, maxAmount }).map((txn) => txn.id)
+
+    expect(ids('120', '')).toEqual(['txn_1', 'txn_2'])
+    expect(ids('', '120')).toEqual(['txn_1', 'txn_3'])
+    expect(ids('100.5', '860')).toEqual(['txn_1', 'txn_2'])
+    expect(ids('120', '120')).toEqual(['txn_1'])
+  })
+
+  it('reports invalid text and ignores the amount filter', () => {
+    for (const [minAmount, maxAmount, invalid] of [
+      ['oops', '100', 'min'],
+      ['10', 'oops', 'max'],
+      ['1e3', '', 'min'],
+      ['', 'Infinity', 'max'],
+    ]) {
+      const filters = { ...baseFilters, minAmount, maxAmount }
+      expect(validateAmountBounds(filters).invalid).toBe(invalid)
+      expect(filterTransactions(transactions, filters)).toEqual(transactions)
+      expect(describeFilters(filters)).not.toContainEqual(expect.objectContaining({ key: 'amount' }))
+    }
+  })
+
+  it('reports reversed bounds and ignores the amount filter', () => {
+    const filters = { ...baseFilters, minAmount: '900', maxAmount: '100' }
+    expect(validateAmountBounds(filters)).toMatchObject({ invalid: 'range', error: 'Min must be less than or equal to Max.' })
+    expect(filterTransactions(transactions, filters)).toEqual(transactions)
+    expect(describeFilters(filters)).not.toContainEqual(expect.objectContaining({ key: 'amount' }))
   })
 
   it('applies relative date presets', () => {
