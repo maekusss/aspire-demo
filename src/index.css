@@ -1,26 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f4f5f1;
+  --bg: #f2f7f4;
   --surface: #ffffff;
-  --surface-2: #eef0ea;
-  --surface-3: #e4e8df;
-  --text: #18201c;
-  --text-muted: #687168;
-  --text-soft: #8b948a;
-  --border: #d9ded4;
-  --border-soft: #e8ebe4;
-  --accent: #167c57;
-  --accent-strong: #0f6b49;
-  --accent-soft: #e1f2e9;
+  --surface-2: #eaf7ef;
+  --surface-3: #d9e7df;
+  --text: #131313;
+  --text-muted: #5a5a5a;
+  --text-soft: #6d706d;
+  --border: #c1d3c9;
+  --border-soft: #d9e7df;
+  --mint: #beffcf;
+  --topbar-start: var(--mint);
+  --background-glow: color-mix(in srgb, var(--mint) 32%, transparent);
+  --accent: #238e47;
+  --accent-strong: #176a37;
+  --accent-soft: #d9fbe4;
+  --on-accent: #ffffff;
   --info: #286fb4;
   --info-soft: #e4eff8;
   --warning: #94640f;
   --warning-soft: #fbefd5;
   --danger: #b13d32;
   --danger-soft: #fae3df;
-  --neutral-soft: #ecefea;
-  --shadow: 0 18px 42px rgba(27, 35, 30, 0.12);
+  --neutral-soft: #edf3f0;
+  --shadow: 0 18px 42px rgba(19, 19, 19, 0.12);
   color: var(--text);
   background: var(--bg);
   font-family:
@@ -32,25 +36,28 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #101310;
-  --surface: #171b17;
-  --surface-2: #20261f;
-  --surface-3: #293127;
-  --text: #eef3eb;
-  --text-muted: #a0aa9d;
-  --text-soft: #747f72;
-  --border: #30382e;
-  --border-soft: #252c24;
-  --accent: #65c793;
-  --accent-strong: #84d9aa;
-  --accent-soft: #173525;
+  --bg: #131313;
+  --surface: #1c211e;
+  --surface-2: #25332a;
+  --surface-3: #34463a;
+  --text: #f2f7f4;
+  --text-muted: #bdcbc2;
+  --text-soft: #a4b5a9;
+  --border: #435649;
+  --border-soft: #34463a;
+  --topbar-start: #25332a;
+  --background-glow: color-mix(in srgb, var(--mint) 10%, transparent);
+  --accent: #beffcf;
+  --accent-strong: #beffcf;
+  --accent-soft: #1c412a;
+  --on-accent: #131313;
   --info: #7db5ec;
   --info-soft: #172b3d;
   --warning: #e1b65f;
   --warning-soft: #3b2e14;
   --danger: #ee8a7d;
   --danger-soft: #3f211f;
-  --neutral-soft: #252b25;
+  --neutral-soft: #29332d;
   --shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
 }
 
@@ -82,7 +89,7 @@ button {
 .app-shell {
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(22, 124, 87, 0.08), transparent 280px),
+    linear-gradient(180deg, var(--background-glow), transparent 280px),
     var(--bg);
 }
 
@@ -96,7 +103,7 @@ button {
   height: 54px;
   padding: 0 18px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: linear-gradient(90deg, var(--topbar-start), var(--surface) 54%);
   backdrop-filter: blur(16px);
 }
 
@@ -129,8 +136,8 @@ button {
   height: 24px;
   place-items: center;
   border-radius: 6px;
-  color: #fff;
-  background: var(--accent);
+  color: #131313;
+  background: var(--mint);
 }
 
 .topbar-actions {
@@ -185,7 +192,7 @@ button {
 .sidebar {
   padding: 14px 8px;
   border-right: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 64%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface));
 }
 
 .side-section {
@@ -550,7 +557,7 @@ button {
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--surface);
 }
 

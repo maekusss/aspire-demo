@@ -301,7 +301,7 @@ function App() {
           <span className="brand-mark">
             <WalletCards size={16} />
           </span>
-          <span>SpendBoard</span>
+          <span>Aspire</span>
         </div>
 
         <div className="topbar-actions">
@@ -459,9 +459,6 @@ function App() {
 
               <button className="ghost-button" type="button" onClick={resetFilters}>
                 Clear
-              </button>
-              <button className="ghost-button" type="button" onClick={() => exportTransactionsCsv(filteredTransactions)}>
-                <Download size={14} /> CSV
               </button>
             </div>
 
