@@ -439,6 +439,16 @@ function App() {
                 ))}
               </select>
 
+              <select
+                className="filter-chip select-chip"
+                value={filters.receipt}
+                onChange={(event) => patchFilters({ receipt: event.target.value as Filters['receipt'] })}
+                aria-label="Receipt"
+              >
+                <option value="all">Receipt: All</option>
+                <option value="missing">Receipt: Missing</option>
+              </select>
+
               <label className="amount-filter">
                 <input
                   aria-label="Minimum amount"

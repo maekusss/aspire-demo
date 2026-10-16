@@ -8,6 +8,7 @@ const baseFilters: Filters = {
   categories: [],
   cards: [],
   statuses: [],
+  receipt: 'all',
   minAmount: '',
   maxAmount: '',
 }
@@ -112,6 +113,13 @@ describe('filterTransactions', () => {
     expect(result.map((txn) => txn.id)).toEqual(['txn_2'])
   })
 
+  it('selects only missing receipts and combines with other filters', () => {
+    expect(filterTransactions(transactions, { ...baseFilters, receipt: 'missing' }).map((txn) => txn.id)).toEqual(['txn_2'])
+    expect(filterTransactions(transactions, { ...baseFilters, receipt: 'missing', statuses: ['Pending'] }).map((txn) => txn.id)).toEqual(['txn_2'])
+    expect(filterTransactions(transactions, { ...baseFilters, receipt: 'missing', statuses: ['Cleared'] })).toEqual([])
+    expect(filterTransactions(transactions, baseFilters).map((txn) => txn.id)).toEqual(['txn_1', 'txn_2', 'txn_3'])
+  })
+
   it('applies relative date presets', () => {
     expect(filterTransactions(transactions, { ...baseFilters, datePreset: '30d' }).map((txn) => txn.id)).toEqual(['txn_1'])
     expect(filterTransactions(transactions, { ...baseFilters, datePreset: 'ytd' }).map((txn) => txn.id)).toEqual(['txn_1', 'txn_2'])
@@ -127,6 +135,7 @@ describe('describeFilters', () => {
         categories: ['Travel', 'Software'],
         cards: ['Operations'],
         statuses: ['Pending'],
+        receipt: 'missing',
         minAmount: '100',
         maxAmount: '1000',
       }),
@@ -135,6 +144,7 @@ describe('describeFilters', () => {
       { key: 'categories', label: 'Category: Travel, Software' },
       { key: 'cards', label: 'Card: Operations' },
       { key: 'statuses', label: 'Status: Pending' },
+      { key: 'receipt', label: 'Receipt: Missing' },
       { key: 'amount', label: 'Amount: 100-1000' },
     ])
   })
