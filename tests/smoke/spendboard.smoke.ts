@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('renders the high-volume dashboard without layout overflow', async ({ page }) => {
-  await expect(page.getByText('SpendBoard')).toBeVisible()
+  await expect(page.getByText('Aspire')).toBeVisible()
   await expect(page.getByLabel('Summary metrics')).toBeVisible()
   await expect(page.getByLabel('Spend charts')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Transactions' })).toBeVisible()

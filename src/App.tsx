@@ -301,7 +301,7 @@ function App() {
           <span className="brand-mark">
             <WalletCards size={16} />
           </span>
-          <span>SpendBoard</span>
+          <span>Aspire</span>
         </div>
 
         <div className="topbar-actions">
