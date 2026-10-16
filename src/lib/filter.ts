@@ -1,4 +1,29 @@
-import type { Filters, Transaction } from '../data/types'
+import type { Filters, ResolvedPeriods, Transaction } from '../data/types'
+import { formatRange } from './format'
+
+export function compileFilters(filters: Filters) {
+  return {
+    query: filters.search.trim().toLowerCase(),
+    minAmount: filters.minAmount === '' ? null : Number(filters.minAmount),
+    maxAmount: filters.maxAmount === '' ? null : Number(filters.maxAmount),
+    categories: new Set(filters.categories),
+    cards: new Set(filters.cards),
+    statuses: new Set(filters.statuses),
+  }
+}
+
+export function matchesNonDateFilters(transaction: Transaction, compiled: ReturnType<typeof compileFilters>) {
+  if (compiled.query) {
+    const haystack = `${transaction.merchant} ${transaction.description} ${transaction.owner}`.toLowerCase()
+    if (!haystack.includes(compiled.query)) return false
+  }
+  if (compiled.categories.size && !compiled.categories.has(transaction.category)) return false
+  if (compiled.cards.size && !compiled.cards.has(transaction.card)) return false
+  if (compiled.statuses.size && !compiled.statuses.has(transaction.status)) return false
+  if (compiled.minAmount !== null && transaction.amount < compiled.minAmount) return false
+  if (compiled.maxAmount !== null && transaction.amount > compiled.maxAmount) return false
+  return true
+}
 
 export function getDateFloor(preset: Filters['datePreset']) {
   const now = new Date()
@@ -19,33 +44,22 @@ export function getDateFloor(preset: Filters['datePreset']) {
 }
 
 export function filterTransactions(transactions: Transaction[], filters: Filters) {
-  const query = filters.search.trim().toLowerCase()
+  const compiled = compileFilters(filters)
   const dateFloor = getDateFloor(filters.datePreset)
-  const minAmount = filters.minAmount === '' ? null : Number(filters.minAmount)
-  const maxAmount = filters.maxAmount === '' ? null : Number(filters.maxAmount)
-  const categorySet = new Set(filters.categories)
-  const cardSet = new Set(filters.cards)
-  const statusSet = new Set(filters.statuses)
 
   return transactions.filter((transaction) => {
-    if (query) {
-      const haystack = `${transaction.merchant} ${transaction.description} ${transaction.owner}`.toLowerCase()
-      if (!haystack.includes(query)) return false
-    }
+    if (!matchesNonDateFilters(transaction, compiled)) return false
     if (dateFloor && new Date(transaction.date) < dateFloor) return false
-    if (categorySet.size > 0 && !categorySet.has(transaction.category)) return false
-    if (cardSet.size > 0 && !cardSet.has(transaction.card)) return false
-    if (statusSet.size > 0 && !statusSet.has(transaction.status)) return false
-    if (minAmount !== null && transaction.amount < minAmount) return false
-    if (maxAmount !== null && transaction.amount > maxAmount) return false
     return true
   })
 }
 
-export function describeFilters(filters: Filters) {
-  const chips: Array<{ key: keyof Filters | 'amount'; label: string }> = []
+export function describeFilters(filters: Filters, compare?: ResolvedPeriods | null, today = new Date()) {
+  const chips: Array<{ key: keyof Filters | 'amount' | 'compare'; label: string }> = []
 
-  if (filters.datePreset !== 'all') {
+  if (compare) {
+    chips.push({ key: 'compare', label: `Comparing: ${formatRange(compare.a.start, compare.a.endExclusive - 1, today)} vs ${formatRange(compare.b.start, compare.b.endExclusive - 1, today)}` })
+  } else if (filters.datePreset !== 'all') {
     const labels = { '30d': 'Last 30 days', '90d': 'Last 90 days', ytd: 'Year to date', all: 'All time' }
     chips.push({ key: 'datePreset', label: `Date: ${labels[filters.datePreset]}` })
   }

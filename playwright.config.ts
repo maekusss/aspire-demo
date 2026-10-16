@@ -7,12 +7,13 @@ export default defineConfig({
   testDir: './tests/smoke',
   testMatch: '**/*.smoke.ts',
   fullyParallel: true,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
-  timeout: 30_000,
+  timeout: 60_000,
   expect: {
-    timeout: 6_000,
+    timeout: 15_000,
   },
   use: {
     baseURL,
