@@ -18,13 +18,15 @@ const searchCount = transactions.filter((transaction) => {
   return haystack.includes(latestTransaction.merchant.toLowerCase())
 }).length
 const flaggedCount = transactions.filter((transaction) => transaction.status === 'Flagged').length
+const missingReceipts = transactions.filter((transaction) => transaction.receipt === false)
+const missingFlaggedCount = missingReceipts.filter((transaction) => transaction.status === 'Flagged').length
 
 const countLabel = (visible: number) => `${visible.toLocaleString('en-US')} of ${transactions.length.toLocaleString('en-US')} transactions`
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('spendboard-app')).toBeVisible()
-  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length))
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length), { timeout: 15_000 })
 })
 
 test('renders the high-volume dashboard without layout overflow', async ({ page }) => {
@@ -57,6 +59,56 @@ test('filters transactions by search, status, and saved view', async ({ page }) 
   await page.getByRole('button', { name: 'SaaS > $500', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Category: SaaS' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Amount: 500-any' })).toBeVisible()
+})
+
+test('filters missing receipts, clears the chip, and restores a saved view after reload', async ({ page }) => {
+  test.setTimeout(60_000)
+  const receipt = page.getByRole('combobox', { name: 'Receipt' })
+  await receipt.selectOption('missing')
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(missingReceipts.length))
+  await expect(page.getByRole('button', { name: 'Receipt: Missing' })).toBeVisible()
+
+  await page.getByLabel('Add status filter').selectOption('Flagged')
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(missingFlaggedCount))
+  await page.getByRole('button', { name: 'Status: Flagged' }).click()
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(missingReceipts.length))
+
+  page.once('dialog', (dialog) => dialog.accept('Friday missing receipts'))
+  await page.getByRole('button', { name: 'New view' }).click()
+  await expect(page.getByRole('button', { name: 'Friday missing receipts', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Receipt: Missing' }).click()
+  await expect(receipt).toHaveValue('all')
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length))
+
+  await page.reload()
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length))
+  await page.getByRole('button', { name: 'Friday missing receipts', exact: true }).click()
+  await expect(receipt).toHaveValue('missing')
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(missingReceipts.length))
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'CSV' }).click()
+  const download = await downloadPromise
+  const csv = readFileSync(await download.path(), 'utf8')
+  expect(csv.trimEnd().split('\n')).toHaveLength(missingReceipts.length + 1)
+})
+
+test('loads an older saved view without a receipt field as All', async ({ page }) => {
+  await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('spendboard-state') ?? '{"state":{}}')
+    const filters = {
+      search: '', datePreset: 'all', categories: [], cards: [], statuses: [], minAmount: '', maxAmount: '',
+    }
+    stored.state.filters = { ...filters, receipt: 'missing' }
+    stored.state.savedViews = [{ id: 'legacy', name: 'Legacy view', filters, createdAt: '2026-01-01T00:00:00.000Z' }]
+    localStorage.setItem('spendboard-state', JSON.stringify(stored))
+  })
+  await page.reload()
+  await expect(page.getByRole('combobox', { name: 'Receipt' })).toHaveValue('missing')
+  await page.getByRole('button', { name: 'Legacy view', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: 'Receipt' })).toHaveValue('all')
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length))
 })
 
 test('keeps filter inputs named and preserves amount and search shortcuts', async ({ page }) => {

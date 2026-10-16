@@ -36,6 +36,7 @@ export function filterTransactions(transactions: Transaction[], filters: Filters
     if (categorySet.size > 0 && !categorySet.has(transaction.category)) return false
     if (cardSet.size > 0 && !cardSet.has(transaction.card)) return false
     if (statusSet.size > 0 && !statusSet.has(transaction.status)) return false
+    if (filters.receipt === 'missing' && transaction.receipt !== false) return false
     if (minAmount !== null && transaction.amount < minAmount) return false
     if (maxAmount !== null && transaction.amount > maxAmount) return false
     return true
@@ -52,6 +53,7 @@ export function describeFilters(filters: Filters) {
   if (filters.categories.length > 0) chips.push({ key: 'categories', label: `Category: ${filters.categories.join(', ')}` })
   if (filters.cards.length > 0) chips.push({ key: 'cards', label: `Card: ${filters.cards.join(', ')}` })
   if (filters.statuses.length > 0) chips.push({ key: 'statuses', label: `Status: ${filters.statuses.join(', ')}` })
+  if (filters.receipt === 'missing') chips.push({ key: 'receipt', label: 'Receipt: Missing' })
   if (filters.minAmount || filters.maxAmount) {
     chips.push({
       key: 'amount',

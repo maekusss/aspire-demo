@@ -37,7 +37,7 @@ export const useAppStore = create<AppState>()(
         },
       ],
       theme: 'light',
-      setFilters: (filters) => set({ filters }),
+      setFilters: (filters) => set({ filters: { ...emptyFilters, ...filters } }),
       patchFilters: (patch) => set((state) => ({ filters: { ...state.filters, ...patch } })),
       resetFilters: () => set({ filters: emptyFilters }),
       clearFilter: (key) =>
@@ -53,14 +53,14 @@ export const useAppStore = create<AppState>()(
         const view: SavedView = {
           id: `view_${Date.now()}`,
           name: trimmed,
-          filters: get().filters,
+          filters: { ...get().filters },
           createdAt: new Date().toISOString(),
         }
         set((state) => ({ savedViews: [view, ...state.savedViews] }))
       },
       loadView: (id) => {
         const view = get().savedViews.find((candidate) => candidate.id === id)
-        if (view) set({ filters: view.filters })
+        if (view) set({ filters: { ...emptyFilters, ...view.filters } })
       },
       removeView: (id) => set((state) => ({ savedViews: state.savedViews.filter((view) => view.id !== id) })),
       setTheme: (theme) => set({ theme }),
@@ -73,6 +73,15 @@ export const useAppStore = create<AppState>()(
         savedViews: state.savedViews,
         theme: state.theme,
       }),
+      merge: (persisted, current) => {
+        const stored = persisted as Partial<AppState>
+        return {
+          ...current,
+          ...stored,
+          filters: { ...emptyFilters, ...stored.filters },
+          savedViews: stored.savedViews ?? current.savedViews,
+        }
+      },
     },
   ),
 )

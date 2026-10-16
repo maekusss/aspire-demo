@@ -6,6 +6,7 @@ export const emptyFilters: Filters = {
   categories: [],
   cards: [],
   statuses: [],
+  receipt: 'all',
   minAmount: '',
   maxAmount: '',
 }

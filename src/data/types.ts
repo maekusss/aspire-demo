@@ -24,6 +24,7 @@ export type Filters = {
   categories: string[]
   cards: string[]
   statuses: TransactionStatus[]
+  receipt: 'all' | 'missing'
   minAmount: string
   maxAmount: string
 }
