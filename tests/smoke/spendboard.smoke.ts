@@ -105,10 +105,12 @@ test('opens transaction details, selection bulk actions, and command palette', a
   await expect(page.getByRole('button', { name: 'Export current view' })).toBeVisible()
 })
 
-test('exports the current transaction view as CSV', async ({ page }) => {
-  const downloadPromise = page.waitForEvent('download')
+test('exports the current view from the command palette without a toolbar CSV button', async ({ page }) => {
+  await expect(page.getByTestId('filterbar').getByRole('button', { name: 'CSV' })).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'CSV' }).click()
+  await page.keyboard.press('Control+K')
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export current view' }).click()
 
   const download = await downloadPromise
   expect(download.suggestedFilename()).toBe('spendboard-transactions.csv')

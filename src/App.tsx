@@ -460,9 +460,6 @@ function App() {
               <button className="ghost-button" type="button" onClick={resetFilters}>
                 Clear
               </button>
-              <button className="ghost-button" type="button" onClick={() => exportTransactionsCsv(filteredTransactions)}>
-                <Download size={14} /> CSV
-              </button>
             </div>
 
             <div className="table-meta" data-testid="table-meta">
