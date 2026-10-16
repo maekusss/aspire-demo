@@ -85,3 +85,47 @@ test('exports the current transaction view as CSV', async ({ page }) => {
   const download = await downloadPromise
   expect(download.suggestedFilename()).toBe('spendboard-transactions.csv')
 })
+
+test('compares periods, validates custom dates, and restores a saved comparison', async ({ page }) => {
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  await page.getByRole('button', { name: /Quarter to date vs same point last quarter/ }).click()
+  await expect(page.getByTestId('compare-total')).toContainText('vs')
+  await expect(page.getByTestId('compare-total').locator('.change-pill')).toBeVisible()
+  await expect(page.getByTestId('table-meta')).toContainText('only')
+  await expect(page.getByLabel('Date range')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Choose comparison periods' }).click()
+  await page.getByRole('button', { name: /Year to date vs same dates last year/ }).click()
+  const before = await page.getByTestId('compare-total').textContent()
+  await page.getByLabel('Add category filter').selectOption('SaaS')
+  await expect(page.getByTestId('compare-total')).not.toHaveText(before ?? '')
+
+  await page.getByRole('button', { name: 'Choose comparison periods' }).click()
+  await page.getByRole('button', { name: /Custom ranges/ }).click()
+  await page.getByLabel('Period A start').fill('2026-10-16')
+  await page.getByLabel('Period A end').fill('2026-10-01')
+  await expect(page.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Cancel' }).click()
+
+  await page.getByRole('button', { name: 'New view' }).click()
+  await page.getByLabel('View name').fill('SaaS YTD comparison')
+  await page.getByRole('button', { name: 'Save view' }).click()
+  await page.reload()
+  await page.getByRole('button', { name: 'SaaS YTD comparison ⇄', exact: true }).click()
+  await expect(page.getByTestId('compare-total')).toBeVisible()
+  await expect(page.getByTestId('table-meta')).toContainText('Year to date')
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false)
+  await page.getByRole('button', { name: 'Turn off compare' }).click()
+  await expect(page.getByLabel('Date range')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Category: SaaS' })).toBeVisible()
+})
+
+test('keeps the dashboard recoverable after a data load failure', async ({ page }) => {
+  await page.route('**/data/transactions.json', (route) => route.fulfill({ status: 500, body: 'unavailable' }))
+  await page.reload()
+  await expect(page.getByText('Transactions failed to load')).toBeVisible()
+  await page.unroute('**/data/transactions.json')
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(page.getByTestId('table-meta')).toContainText(countLabel(transactions.length))
+})

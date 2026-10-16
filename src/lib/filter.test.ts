@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Filters, Transaction } from '../data/types'
 import { describeFilters, filterTransactions, getDateFloor } from './filter'
+import { resolvePeriods } from './periods'
 
 const baseFilters: Filters = {
   search: '',
@@ -137,5 +138,12 @@ describe('describeFilters', () => {
       { key: 'statuses', label: 'Status: Pending' },
       { key: 'amount', label: 'Amount: 100-1000' },
     ])
+  })
+  it('replaces the date chip with the comparison range', () => {
+    const today = new Date(2026, 9, 16)
+    const periods = resolvePeriods({ on: true, preset: 'qtd', custom: null }, today)
+    const chips = describeFilters({ ...baseFilters, datePreset: '90d', categories: ['SaaS'] }, periods, today)
+    expect(chips[0]).toEqual({ key: 'compare', label: 'Comparing: Oct 1–16 vs Jul 1–16' })
+    expect(chips.some((chip) => chip.key === 'datePreset')).toBe(false)
   })
 })

@@ -22,6 +22,13 @@ flowchart LR
   Dataset["public/data/transactions.json"] --> Loader["App data loader"]
   Loader --> Store["Zustand persisted state"]
   Store --> Filters["filterTransactions"]
+  Store --> Compare["compare setting"]
+  Compare --> Periods["periods.ts resolves A and B"]
+  Periods --> Aggregate["compare.ts one-pass aggregation"]
+  Loader --> Aggregate
+  Aggregate --> Table
+  Aggregate --> Metrics
+  Aggregate --> Charts
   Filters --> Table["TanStack Table sorting"]
   Table --> Virtualizer["TanStack Virtual rows"]
   Virtualizer --> Rows["Visible row window"]
@@ -38,6 +45,7 @@ The dataset is committed as a static asset instead of imported into the JavaScri
 Persistent state lives in `src/store/useAppStore.ts`:
 
 - Current filters.
+- Comparison setting (preset or fixed custom ranges).
 - Saved views.
 - Theme.
 
@@ -60,6 +68,8 @@ Filtering stays on the main thread because 50,000 rows is below the point where 
 - Convert category/card/status filters into sets.
 - Return early on cheap checks.
 - Keep date and amount checks straightforward and typed.
+
+Compare mode keeps the regular date filter stored but resolves its own period pair from `periods.ts`. `compare.ts` applies the shared non-date filters and aggregates both periods in one pass; only period A rows reach the table and export.
 
 At 500,000+ rows, the next architecture step would be a Web Worker that owns filtering and aggregation while React remains the rendering layer.
 

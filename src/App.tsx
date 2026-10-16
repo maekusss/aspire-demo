@@ -13,6 +13,7 @@ import {
   ArrowUp,
   Bookmark,
   Check,
+  ChevronDown,
   Command,
   Download,
   Flag,
@@ -26,8 +27,11 @@ import {
   WalletCards,
   X,
 } from 'lucide-react'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { Filters, Transaction } from './data/types'
+import ChangePill from './components/ChangePill'
+import ComparePopover from './components/ComparePopover'
+import { buildComparison, computeChange } from './lib/compare'
 import { statuses, statusTone } from './lib/constants'
 import { exportTransactionsCsv } from './lib/exportCsv'
 import { describeFilters, filterTransactions } from './lib/filter'
@@ -36,9 +40,12 @@ import {
   formatCurrency,
   formatDate,
   formatLongDate,
+  formatRoundedCurrency,
+  formatRange,
   initials,
   numberFormatter,
 } from './lib/format'
+import { localDateKey, resolvePeriods } from './lib/periods'
 import { useAppStore } from './store/useAppStore'
 
 const SpendCharts = lazy(() => import('./components/SpendCharts'))
@@ -46,7 +53,7 @@ const SpendCharts = lazy(() => import('./components/SpendCharts'))
 type Metric = {
   label: string
   value: number | string
-  delta: string
+  delta: ReactNode
   tone?: 'positive' | 'negative' | 'neutral'
   format?: (value: number) => string
 }
@@ -83,7 +90,12 @@ function App() {
   const {
     filters,
     savedViews,
+    compare,
+    compareWarning,
     theme,
+    setCompare,
+    turnOffCompare,
+    clearCompareWarning,
     patchFilters,
     resetFilters,
     clearFilter,
@@ -97,13 +109,38 @@ function App() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [commandOpen, setCommandOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [viewName, setViewName] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+  const [, setDayTick] = useState(0)
+  const todayKey = localDateKey(new Date())
+  const today = useMemo(() => { const [year, month, day] = todayKey.split('-').map(Number); return new Date(year, month - 1, day) }, [todayKey])
   const [detail, setDetail] = useState<Transaction | null>(null)
   const [activeRowIndex, setActiveRowIndex] = useState(0)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const searchRef = useRef<HTMLInputElement>(null)
   const tableScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDayTick((tick) => tick + 1), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (compareWarning) {
+      queueMicrotask(() => { setToast(compareWarning); clearCompareWarning() })
+    }
+  }, [compareWarning, clearCompareWarning])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -125,7 +162,7 @@ function App() {
       })
       .then((data) => {
         if (!cancelled) {
-          setTransactions(data)
+          setTransactions(data.map((transaction) => ({ ...transaction, ts: Date.parse(transaction.date) })))
           setLoadState('ready')
         }
       })
@@ -136,7 +173,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadAttempt])
 
   const categories = useMemo(
     () => Array.from(new Set(transactions.map((transaction) => transaction.category))).sort(),
@@ -147,9 +184,14 @@ function App() {
     [transactions],
   )
 
+  const periods = useMemo(() => compare?.on ? resolvePeriods(compare, today) : null, [compare, today])
+  const comparison = useMemo(
+    () => loadState === 'ready' && periods ? buildComparison(transactions, filters, periods) : null,
+    [transactions, filters, periods, loadState],
+  )
   const filteredTransactions = useMemo(
-    () => (loadState === 'ready' ? filterTransactions(transactions, filters) : []),
-    [filters, loadState, transactions],
+    () => loadState !== 'ready' ? [] : comparison ? comparison.rowsA : filterTransactions(transactions, filters),
+    [filters, loadState, transactions, comparison],
   )
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -183,10 +225,12 @@ function App() {
     [selectedTransactions],
   )
 
-  const metrics = useMemo(() => buildMetrics(filteredTransactions), [filteredTransactions])
-  const spendOverTime = useMemo(() => buildSpendOverTime(filteredTransactions), [filteredTransactions])
-  const spendByCategory = useMemo(() => buildSpendByCategory(filteredTransactions), [filteredTransactions])
-  const activeChips = describeFilters(filters)
+  const metrics = useMemo(() => comparison ? [] : buildMetrics(filteredTransactions), [filteredTransactions, comparison])
+  const spendOverTime = useMemo(() => comparison ? Array.from({ length: Math.max(comparison.a.buckets.length, comparison.b.buckets.length) }, (_, index) => ({ month: `${comparison.bucketUnit === 'day' ? 'Day' : comparison.bucketUnit === 'week' ? 'Wk' : 'Mo'} ${index + 1}`, spend: comparison.a.buckets[index] ?? null, previousSpend: comparison.b.buckets[index] ?? null })) : buildSpendOverTime(filteredTransactions), [filteredTransactions, comparison])
+  const spendByCategory = useMemo(() => comparison ? comparison.categories.map((category) => ({ category, spend: comparison.a.byCategory.get(category) ?? 0, previousSpend: comparison.b.byCategory.get(category) ?? 0 })) : buildSpendByCategory(filteredTransactions), [filteredTransactions, comparison])
+  const activeChips = describeFilters(filters, periods, today)
+
+  useEffect(() => { queueMicrotask(() => setSelectedIds(new Set())) }, [filteredTransactions])
 
   useEffect(() => {
     const shouldOpenDrawer = new URLSearchParams(window.location.search).get('drawer') === '1'
@@ -253,8 +297,8 @@ function App() {
   }
 
   const handleSaveView = () => {
-    const name = window.prompt('Name this saved view')
-    if (name) saveView(name)
+    setViewName(`${filters.categories[0] ?? 'All spend'}${periods ? `: ${periods.aLabel.toLowerCase()} vs ${periods.bLabel.toLowerCase()}` : ''}`)
+    setSaveOpen(true)
   }
 
   const toggleSelected = (index: number, transaction: Transaction, mode: 'single' | 'range' | 'toggle') => {
@@ -332,7 +376,7 @@ function App() {
           {savedViews.map((view) => (
             <div className="saved-view" key={view.id}>
               <button className="side-item" type="button" onClick={() => loadView(view.id)}>
-                <Bookmark size={14} /> {view.name}
+                <Bookmark size={14} /> {view.name}{view.compare?.on && <span className="saved-compare-tag">⇄</span>}
               </button>
               <button
                 className="small-ghost"
@@ -350,19 +394,34 @@ function App() {
         </aside>
 
         <main className="dashboard">
-          <section className="metrics-grid" aria-label="Summary metrics">
-            {metrics.map((metric) => (
-              <MetricCard metric={metric} key={metric.label} />
-            ))}
+          {loadState === 'error' ? <ErrorState onRetry={() => { setLoadState('loading'); setLoadAttempt((attempt) => attempt + 1) }} /> : <>
+          <section className={`metrics-grid${comparison ? ' comparing' : ''}`} aria-label="Summary metrics">
+            {loadState === 'loading' ? Array.from({ length: periods ? 3 : 4 }, (_, index) => <div className="metric-card metric-skeleton" key={index}><div className="skeleton-row"><span /><span /></div></div>) : comparison && periods ? <>
+              <div className="metric-card compare-card" data-testid="compare-total">
+                <div className="metric-label">Total spend · {periods.aLabel}</div>
+                <div className="metric-value"><AnimatedNumber value={comparison.a.total} format={formatRoundedCurrency} /></div>
+                <ChangePill change={computeChange(comparison.a.total, comparison.b.total)} />
+                <div className="compare-vs">vs {formatRoundedCurrency(comparison.b.total)} · {periods.bLabel.toLowerCase()} ({formatRange(periods.b.start, periods.b.endExclusive - 1, today)})</div>
+              </div>
+              <div className="metric-card compare-card" data-testid="compare-count">
+                <div className="metric-label">Transactions · {periods.aLabel}</div>
+                <div className="metric-value"><AnimatedNumber value={comparison.a.count} format={numberFormatter.format} /></div>
+                <ChangePill count change={computeChange(comparison.a.count, comparison.b.count, true)} />
+                <div className="compare-vs">vs {numberFormatter.format(comparison.b.count)} · {periods.bLabel.toLowerCase()} ({formatRange(periods.b.start, periods.b.endExclusive - 1, today)})</div>
+              </div>
+              <div className="metric-card compare-card compare-categories" data-testid="compare-categories">
+                <div className="metric-label compare-cat-header"><span>Top categories · {periods.aLabel}</span><span>change vs {periods.bLabel.toLowerCase()}</span></div>
+                {comparison.categories.length ? comparison.categories.slice(0, 5).map((category) => <button className="compare-cat-row" type="button" key={category} onClick={() => addListFilter('categories', category)}>
+                  <strong>{category}</strong><span className="compare-cat-values">{formatCompactCurrency(comparison.a.byCategory.get(category) ?? 0)} <small>vs {formatCompactCurrency(comparison.b.byCategory.get(category) ?? 0)}</small></span>
+                  <ChangePill small change={computeChange(comparison.a.byCategory.get(category) ?? 0, comparison.b.byCategory.get(category) ?? 0)} />
+                </button>) : <div className="compare-vs">No spend in either period</div>}
+              </div>
+            </> : metrics.map((metric) => <MetricCard metric={metric} key={metric.label} />)}
           </section>
 
-          <Suspense fallback={<ChartFallback />}>
-            <SpendCharts
-              spendOverTime={spendOverTime}
-              spendByCategory={spendByCategory}
-              onCategorySelect={(category) => patchFilters({ categories: [category] })}
-            />
-          </Suspense>
+          {loadState === 'loading' ? <ChartFallback /> : comparison && !comparison.a.count && !comparison.b.count ? <section className="chart-row" aria-label="Spend charts"><div className="chart-panel compare-empty">No spend in either period · Remove a filter or pick different periods.</div></section> : <ChartErrorBoundary><Suspense fallback={<ChartFallback />}>
+            <SpendCharts spendOverTime={spendOverTime} spendByCategory={spendByCategory} previous={periods ? { aLabel: periods.aLabel, bLabel: periods.bLabel } : undefined} onCategorySelect={(category) => addListFilter('categories', category)} />
+          </Suspense></ChartErrorBoundary>}
 
           <section className="table-panel" aria-label="Transactions">
             <div className="filterbar" data-testid="filterbar">
@@ -378,13 +437,13 @@ function App() {
               </label>
 
               {activeChips.map((chip) => (
-                <button className="filter-chip active" key={chip.key} type="button" onClick={() => clearFilter(chip.key)}>
+                <button className="filter-chip active" key={chip.key} type="button" onClick={() => chip.key === 'compare' ? turnOffCompare() : clearFilter(chip.key)}>
                   {chip.label}
                   <X size={12} />
                 </button>
               ))}
 
-              <select
+              {!periods && <select
                 className="filter-chip select-chip"
                 value={filters.datePreset}
                 onChange={(event) => patchFilters({ datePreset: event.target.value as Filters['datePreset'] })}
@@ -394,7 +453,15 @@ function App() {
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
                 <option value="ytd">Year to date</option>
-              </select>
+              </select>}
+
+              <div className="compare-control">
+                <button className={`filter-chip chip-compare${periods ? ' active' : ''}`} type="button" aria-label={periods ? 'Choose comparison periods' : 'Compare'} aria-expanded={compareOpen} onClick={() => setCompareOpen(!compareOpen)}>
+                  ⇄ {periods ? `${periods.aLabel} vs ${periods.bLabel}` : 'Compare'} <ChevronDown size={12} />
+                </button>
+                {periods && <button className="compare-off" type="button" aria-label="Turn off compare" onClick={turnOffCompare}>×</button>}
+                <ComparePopover compare={compare} today={today} open={compareOpen} onClose={() => setCompareOpen(false)} onOff={turnOffCompare} onChoose={setCompare} />
+              </div>
 
               <select
                 className="filter-chip select-chip"
@@ -462,9 +529,12 @@ function App() {
               </button>
             </div>
 
+            {periods && <div className="compare-note">Comparing <strong>{formatRange(periods.a.start, periods.a.endExclusive - 1, today)}</strong> ({periods.aDays} days) with <strong>{formatRange(periods.b.start, periods.b.endExclusive - 1, today)}</strong> ({periods.bDays} days). Other filters apply to both. {compare?.preset === 'custom' && periods.lengthsDiffer && <span className="compare-warn">Periods are different lengths</span>}</div>}
+
             <div className="table-meta" data-testid="table-meta">
               <span>{numberFormatter.format(rows.length)} of {numberFormatter.format(transactions.length)} transactions</span>
-              <span>{formatCompactCurrency(metrics[0].value as number)} in visible spend</span>
+              {periods && <span className="compare-scope">Showing {periods.aLabel} · {formatRange(periods.a.start, periods.a.endExclusive - 1, today)} only</span>}
+              <span>{formatCompactCurrency(comparison?.a.total ?? (metrics[0]?.value as number ?? 0))} in visible spend</span>
             </div>
 
             <div className="data-table">
@@ -495,7 +565,6 @@ function App() {
 
               <div className="table-scroll" ref={tableScrollRef}>
                 {loadState === 'loading' && <LoadingRows />}
-                {loadState === 'error' && <ErrorState />}
                 {loadState === 'ready' && rows.length === 0 && <EmptyState resetFilters={resetFilters} />}
                 {loadState === 'ready' && rows.length > 0 && (
                   <div className="virtual-canvas" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
@@ -555,6 +624,7 @@ function App() {
               </div>
             </div>
           </section>
+          </>}
         </main>
       </div>
 
@@ -589,10 +659,22 @@ function App() {
       </AnimatePresence>
 
       <DetailDrawer transaction={detail} onClose={() => setDetail(null)} />
+      {saveOpen && <div className="save-overlay" onClick={(event) => { if (event.target === event.currentTarget) setSaveOpen(false) }}><div className="save-modal" role="dialog" aria-label="Save view">
+        <h2>Save this view</h2><p>It appears under Saved in the sidebar.</p>
+        <input autoFocus aria-label="View name" value={viewName} onChange={(event) => setViewName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && viewName.trim()) { saveView(viewName); setSaveOpen(false) } }} />
+        <div className="save-summary"><strong>Filters:</strong> {activeChips.filter((chip) => chip.key !== 'compare').map((chip) => chip.label).join(' · ') || 'None'}<br />{periods ? <strong>⇄ Comparing {compare?.preset === 'custom' ? 'fixed dates' : `${periods.aLabel.toLowerCase()} vs ${periods.bLabel.toLowerCase()} — rolls forward automatically`}</strong> : 'No comparison — opens as a single period.'}</div>
+        <div className="save-actions"><button type="button" onClick={() => setSaveOpen(false)}>Cancel</button><button type="button" disabled={!viewName.trim()} onClick={() => { saveView(viewName); setSaveOpen(false) }}>Save view</button></div>
+      </div></div>}
+      {toast && <div className="compare-toast" role="status">{toast}</div>}
       <CommandPalette
         open={commandOpen}
         onClose={() => setCommandOpen(false)}
         actions={[
+          {
+            label: 'Compare periods',
+            run: () => setCompareOpen(true),
+          },
+          ...(periods ? [{ label: 'Turn off compare', run: turnOffCompare }] : []),
           {
             label: 'Focus search',
             run: () => searchRef.current?.focus(),
@@ -632,6 +714,15 @@ function ChartFallback() {
       </div>
     </section>
   )
+}
+
+class ChartErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: Error) { console.warn('Spend charts could not load', error) }
+  render() {
+    return this.state.failed ? <section className="chart-row" aria-label="Spend charts"><div className="chart-panel compare-empty">Spend charts couldn't load. Cards and transactions are still available.</div></section> : this.props.children
+  }
 }
 
 function MetricCard({ metric }: { metric: Metric }) {
@@ -824,14 +915,15 @@ function EmptyState({ resetFilters }: { resetFilters: () => void }) {
   )
 }
 
-function ErrorState() {
+function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="empty-state">
       <div className="empty-icon danger-icon">
         <X size={20} />
       </div>
       <h2>Transactions failed to load</h2>
-      <p>The static dataset could not be read. Regenerate it with npm run gen:data, then refresh.</p>
+      <p>We couldn't load your transactions. Your filters, saved views and comparison are kept.</p>
+      <button className="ghost-button" type="button" onClick={onRetry}>Try again</button>
     </div>
   )
 }
@@ -847,8 +939,7 @@ function buildMetrics(data: Transaction[]): Metric[] {
     {
       label: 'Total spend',
       value: total,
-      delta: `${mom >= 0 ? '+' : ''}${mom.toFixed(1)}% MoM`,
-      tone: mom >= 0 ? 'positive' : 'negative',
+      delta: <><ChangePill change={mom} /><span className="compare-vs">this month vs last month</span></>,
       format: formatCompactCurrency,
     },
     {
@@ -885,7 +976,6 @@ function calculateMonthDelta(data: Transaction[]) {
   const now = new Date()
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1)
   let current = 0
   let previous = 0
 
@@ -893,11 +983,9 @@ function calculateMonthDelta(data: Transaction[]) {
     const date = new Date(transaction.date)
     if (date >= thisMonth) current += transaction.amount
     else if (date >= lastMonth && date < thisMonth) previous += transaction.amount
-    else if (previous === 0 && date >= twoMonthsAgo && date < lastMonth) previous += transaction.amount
   }
 
-  if (previous === 0) return 0
-  return ((current - previous) / previous) * 100
+  return computeChange(current, previous)
 }
 
 function buildSpendOverTime(data: Transaction[]) {
