@@ -77,6 +77,7 @@ describe('getDateFloor', () => {
   })
 
   it('returns the correct lower date bound for relative presets', () => {
+    expect(getDateFloor('month')?.toISOString()).toBe(new Date(2026, 4, 1).toISOString())
     expect(getDateFloor('30d')?.toISOString()).toBe('2026-04-14T12:00:00.000Z')
     expect(getDateFloor('90d')?.toISOString()).toBe('2026-02-13T12:00:00.000Z')
     expect(getDateFloor('ytd')?.toISOString()).toBe(new Date(2026, 0, 1).toISOString())
@@ -116,9 +117,26 @@ describe('filterTransactions', () => {
     expect(filterTransactions(transactions, { ...baseFilters, datePreset: '30d' }).map((txn) => txn.id)).toEqual(['txn_1'])
     expect(filterTransactions(transactions, { ...baseFilters, datePreset: 'ytd' }).map((txn) => txn.id)).toEqual(['txn_1', 'txn_2'])
   })
+
+  it('includes the first instant of this month but excludes the instant before it', () => {
+    const monthStart = new Date(2026, 4, 1)
+    const boundaryTransactions = [
+      { ...transactions[0], id: 'before', date: new Date(monthStart.getTime() - 1).toISOString() },
+      { ...transactions[0], id: 'at', date: monthStart.toISOString() },
+      { ...transactions[0], id: 'after', date: new Date(monthStart.getTime() + 1).toISOString() },
+    ]
+
+    expect(filterTransactions(boundaryTransactions, { ...baseFilters, datePreset: 'month' }).map((txn) => txn.id)).toEqual(['at', 'after'])
+    expect(filterTransactions(boundaryTransactions, { ...baseFilters, datePreset: '30d' }).map((txn) => txn.id)).toEqual(['before', 'at', 'after'])
+  })
 })
 
 describe('describeFilters', () => {
+  it('labels the calendar-month preset separately from the rolling preset', () => {
+    expect(describeFilters({ ...baseFilters, datePreset: 'month' })).toEqual([{ key: 'datePreset', label: 'Date: This month' }])
+    expect(describeFilters({ ...baseFilters, datePreset: '30d' })).toEqual([{ key: 'datePreset', label: 'Date: Last 30 days' }])
+  })
+
   it('returns active filter chips in a recruiter-readable order', () => {
     expect(
       describeFilters({

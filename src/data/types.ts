@@ -20,7 +20,7 @@ export type Transaction = {
 
 export type Filters = {
   search: string
-  datePreset: 'all' | '30d' | '90d' | 'ytd'
+  datePreset: 'all' | 'month' | '30d' | '90d' | 'ytd'
   categories: string[]
   cards: string[]
   statuses: TransactionStatus[]
